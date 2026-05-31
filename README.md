@@ -64,7 +64,7 @@ The transfer learning model achieved strong performance in identifying pneumonia
 | Pneumonia Images | 4,273 |
 | Classes | 2 |
 | Split | Train / Validation / Test |
-| Source | Guangzhou Women and Children's Medical Center |
+| Source | Kaggle |
 
 <br><br>
 
