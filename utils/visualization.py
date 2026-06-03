@@ -10,6 +10,7 @@ from sklearn.metrics import (
     auc, precision_recall_curve, average_precision_score
 )
 import tensorflow as tf
+from src import model
 from tf_keras_vis.gradcam import Gradcam
 from tf_keras_vis.utils.model_modifiers import ReplaceToLinear
 from tf_keras_vis.utils.scores import CategoricalScore
@@ -215,8 +216,7 @@ def plot_roc_curve(y_true, y_pred_probs, save_path='../results/roc_curve.png'):
     roc_auc = auc(fpr, tpr)
     
     plt.figure(figsize=(8, 6))
-   plt.plot(fpr, tpr, color=PURPLE, lw=2,
-         label=f'ROC curve (AUC = {roc_auc:.3f})')
+    plt.plot(fpr, tpr, color=PURPLE, lw=2, label=f'ROC curve (AUC = {roc_auc:.3f})')
     plt.plot([0, 1], [0, 1], color=LIGHT_PURPLE, lw=2, linestyle='--', label='Random Classifier')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -309,76 +309,82 @@ def visualize_predictions(model, test_generator, num_samples=16,
 
 
 def generate_gradcam_heatmaps(model, test_generator, num_samples=8,
-                              save_path='../results/gradcam_visualization.png'):
-    """
-    Generate Grad-CAM (Gradient-weighted Class Activation Mapping) heatmaps.
-    
-    Grad-CAM highlights which parts of the image the model focuses on for predictions.
-    Critical for medical imaging to verify model is looking at relevant features.
-    
-    Args:
-        model: Trained model
-        test_generator: Test data generator
-        num_samples: Number of samples to visualize
-        save_path: Path to save visualization
-    """
+                              save_path='../results/gradcam.png'):
+
     print("\nGenerating Grad-CAM visualizations...")
-    
-    # Get sample images
+
     test_generator.reset()
     images, labels = next(test_generator)
+
     images = images[:num_samples]
     labels = labels[:num_samples]
-    
-    # Modify model for Grad-CAM (replace softmax/sigmoid with linear)
-    replace2linear = ReplaceToLinear()
-    
-    # Create Grad-CAM object
-    gradcam = Gradcam(model, model_modifier=replace2linear, clone=True)
-    
-    # Generate heatmaps
-    predictions = model.predict(images)
+
     class_names = {v: k for k, v in test_generator.class_indices.items()}
-    
-    fig, axes = plt.subplots(num_samples, 3, figsize=(12, num_samples*3))
-    
+
+    # Choose correct layer name
+    if "VGG16" in model.name:
+        last_conv_layer = "block5_conv3"
+    else:
+        last_conv_layer = "conv4_2"
+
+    fig, axes = plt.subplots(num_samples, 3, figsize=(12, num_samples * 3))
+
+    predictions = model.predict(images)
+
     for i in range(num_samples):
-        # Original image
+
+        heatmap = make_gradcam_heatmap(images[i:i+1], model, last_conv_layer)
+
         axes[i, 0].imshow(images[i])
-        axes[i, 0].set_title('Original X-Ray', fontsize=11, fontweight='bold')
-        axes[i, 0].axis('off')
-        
-        # Generate Grad-CAM heatmap
-        pred_class_idx = int(predictions[i] > 0.5)
-        score = CategoricalScore([pred_class_idx])
-        
-        # Compute heatmap
-        cam = gradcam(score, images[i:i+1], penultimate_layer=-1)
-        heatmap = cam[0]
-        
-        # Heatmap only
-        axes[i, 1].imshow(heatmap, cmap='Purples')        
-        axes[i, 1].set_title('Grad-CAM Heatmap', fontsize=11, fontweight='bold')
-        axes[i, 1].axis('off')
-        
-        # Overlay heatmap on original
+        axes[i, 0].set_title("Original")
+        axes[i, 0].axis("off")
+
+        axes[i, 1].imshow(heatmap, cmap="viridis")
+        axes[i, 1].set_title("Heatmap")
+        axes[i, 1].axis("off")
+
         axes[i, 2].imshow(images[i])
-        axes[i, 2].imshow(heatmap, cmap='Purples', alpha=0.5)
+        axes[i, 2].imshow(heatmap, cmap="viridis", alpha=0.5)
 
         true_class = class_names[int(labels[i])]
-        pred_class = class_names[pred_class_idx]
-        confidence = predictions[i][0] if pred_class_idx == 1 else 1 - predictions[i][0]
-        
-        color = 'green' if true_class == pred_class else 'red'
+        pred_class = class_names[int(predictions[i] > 0.5)]
+
+        color = "green" if true_class == pred_class else "red"
+
         axes[i, 2].set_title(
-            f'Overlay\nTrue: {true_class} | Pred: {pred_class} ({confidence*100:.1f}%)',
-            fontsize=10, fontweight='bold', color=color
+            f"True: {true_class} | Pred: {pred_class}",
+            color=color
         )
-        axes[i, 2].axis('off')
-    
-    plt.suptitle('Grad-CAM: Model Attention Visualization', 
-                fontsize=16, fontweight='bold', y=0.998)
+        axes[i, 2].axis("off")
+
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.savefig(save_path, dpi=300)
     plt.show()
-    print(f"Grad-CAM visualization saved to {save_path}")
+
+    print(f"Saved to {save_path}")
+
+def make_gradcam_heatmap(img_array, model, last_conv_layer_name):
+    grad_model = tf.keras.models.Model(
+        inputs=model.input,
+        outputs=[
+            model.get_layer(last_conv_layer_name).output,
+            model.output
+        ]
+    )
+
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model(img_array)
+        loss = predictions[:, 0]
+
+    grads = tape.gradient(loss, conv_outputs)
+
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+    conv_outputs = conv_outputs[0]
+    heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+
+    heatmap = tf.maximum(heatmap, 0)
+    heatmap = heatmap / tf.math.reduce_max(heatmap + 1e-8)
+
+    return heatmap.numpy()
