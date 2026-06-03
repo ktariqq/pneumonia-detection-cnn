@@ -70,8 +70,6 @@ The transfer learning model achieved strong performance in identifying pneumonia
 
 ## 🟣 Deep Learning Pipeline
 
-<p align="center"><img align="center" src="results/training_history.png" style="width:75%; height:auto;"></p>
-
 The workflow includes:
 
 - Dataset preprocessing and normalization
@@ -90,8 +88,6 @@ Grad-CAM heatmaps are generated to visualize regions that influence model predic
 
 This allows verification that the network focuses on clinically relevant lung regions rather than image artifacts, improving confidence in model decisions.
 
-<p align="center"><img align="center" src="results/gradcam_visualization.png" style="width:75%; height:auto;"></p>
-
 <br><br>
 
 ## 🟣 Evaluation Outputs
@@ -105,7 +101,9 @@ The project automatically generates:
 - Grad-CAM visualizations
 - Sample prediction visualizations
 - Model comparison reports
-
+<p align="center"><img align="center" src="results/VGG16_predictions.png" style="width:50%; height:auto;"></p>
+<p align="center"><img align="center" src="results/Custom_CNN_training_history.png" style="width:50%; height:auto;"></p>
+<p align="center"><img align="center" src="results/VGG16_training_history.png" style="width:50%; height:auto;"></p>
 <br><br>
 
 ## 🟣 Project Structure
