@@ -188,7 +188,7 @@ pneumonia-detection-cnn/
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/pneumonia-detection-cnn.git
+git clone https://github.com/ktariqq/pneumonia-detection-cnn.git
 cd pneumonia-detection-cnn
 ```
 ### 2. Install Dependencies
